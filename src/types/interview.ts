@@ -1,4 +1,5 @@
 export type InterviewType = "technical" | "hr";
+export type TtsProvider = "browser" | "self_hosted";
 
 export interface InterviewQuestion {
   id: string;
@@ -8,17 +9,17 @@ export interface InterviewQuestion {
   timeLimitSec: number;
 }
 
-export interface RecordedResponse {
+export interface QuestionTimelineSegment {
   questionId: string;
-  blob: Blob;
-  durationSec: number;
-  startedAt: string;
-  endedAt: string;
-  pauseCount: number;
+  questionText: string;
+  narrationStartMs: number;
+  narrationEndMs: number;
+  answerWindowStartMs: number;
+  answerWindowEndMs: number;
 }
 
-export interface ResponseMeta {
-  questionId: string;
+export interface InterviewRecordingBundle {
+  mimeType: string;
   durationSec: number;
   startedAt: string;
   endedAt: string;
@@ -29,14 +30,22 @@ export interface ResultsRouteState {
   interviewType: InterviewType;
   totalQuestions: number;
   answeredQuestions: number;
-  responsesMeta: ResponseMeta[];
+  recording: InterviewRecordingBundle | null;
+  timeline: QuestionTimelineSegment[];
+  tts: {
+    provider: TtsProvider;
+    localeRequested: string;
+    localeResolved: string | null;
+    available: boolean;
+    fallbackUsed: boolean;
+  };
 }
 
 export interface InterviewSessionState {
   interviewType: InterviewType;
   questions: InterviewQuestion[];
   currentIndex: number;
-  responsesMeta: ResponseMeta[];
+  timeline: QuestionTimelineSegment[];
   isRecording: boolean;
   timeLeftSec: number;
 }

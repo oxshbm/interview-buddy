@@ -1,6 +1,6 @@
 import type { ResultsRouteState } from "../types/interview";
 
-const SESSION_KEY = "interviewBuddy:session";
+const SESSION_KEY = "interviewBuddy:session:v2";
 
 export function saveSessionState(state: ResultsRouteState): void {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));

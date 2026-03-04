@@ -20,18 +20,20 @@ function scoreDuration(durationSec: number): number {
 
 export function buildInterviewReport(state: ResultsRouteState): InterviewReport {
   const completionRatio = state.totalQuestions > 0 ? state.answeredQuestions / state.totalQuestions : 0;
+  const pausePenaltyPerQuestion = (state.recording?.pauseCount ?? 0) * 2;
 
-  const perQuestion: QuestionScore[] = state.responsesMeta.map((response) => {
-    const durationQuality = scoreDuration(response.durationSec);
-    const pausePenalty = response.pauseCount * 3;
+  const perQuestion: QuestionScore[] = state.timeline.map((segment) => {
+    const durationSec = Math.max((segment.answerWindowEndMs - segment.answerWindowStartMs) / 1000, 0);
+    const durationQuality = scoreDuration(durationSec);
 
-    const speechScore = clamp(Math.round(durationQuality - pausePenalty));
-    const contentScore = clamp(Math.round(60 + completionRatio * 35 + Math.min(response.durationSec / 3, 12)));
-    const bodyLanguageScore = clamp(Math.round(72 + (durationQuality - 70) * 0.35 - pausePenalty * 0.6));
+    const speechScore = clamp(Math.round(durationQuality - pausePenaltyPerQuestion));
+    const contentScore = clamp(Math.round(58 + completionRatio * 35 + Math.min(durationSec / 3, 12)));
+    const bodyLanguageScore = clamp(Math.round(70 + (durationQuality - 70) * 0.4 - pausePenaltyPerQuestion * 0.5));
     const overall = clamp(Math.round((speechScore + contentScore + bodyLanguageScore) / 3));
 
     return {
-      questionId: response.questionId,
+      questionId: segment.questionId,
+      questionText: segment.questionText,
       speechScore,
       contentScore,
       bodyLanguageScore,
@@ -45,7 +47,7 @@ export function buildInterviewReport(state: ResultsRouteState): InterviewReport 
 
   const completionContribution = completionRatio * 20;
   const durationContribution = avg(perQuestion.map((q) => q.speechScore)) / 10;
-  const stabilityContribution = clamp(10 - avg(state.responsesMeta.map((r) => r.pauseCount * 2)), 0, 10);
+  const stabilityContribution = clamp(10 - pausePenaltyPerQuestion, 0, 10);
 
   const overallScore = clamp(Math.round(60 + completionContribution + durationContribution + stabilityContribution));
   const grade = scoreToGrade(overallScore);

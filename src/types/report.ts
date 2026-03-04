@@ -1,5 +1,6 @@
 export interface QuestionScore {
   questionId: string;
+  questionText: string;
   speechScore: number;
   contentScore: number;
   bodyLanguageScore: number;

@@ -1,21 +1,17 @@
 import { useMemo, useState } from "react";
-import type { InterviewQuestion, ResponseMeta } from "../types/interview";
+import type { InterviewQuestion } from "../types/interview";
 
 export function useInterviewSession(questions: InterviewQuestion[]) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [responsesMeta, setResponsesMeta] = useState<ResponseMeta[]>([]);
   const [timeLeftSec, setTimeLeftSec] = useState(questions[0]?.timeLimitSec ?? 120);
 
   const currentQuestion = questions[currentIndex];
-  const progress = useMemo(() => ((currentIndex + 1) / Math.max(questions.length, 1)) * 100, [currentIndex, questions.length]);
+  const isLastQuestion = currentIndex === questions.length - 1;
 
-  const saveResponseMeta = (meta: ResponseMeta) => {
-    setResponsesMeta((prev) => {
-      const exists = prev.some((r) => r.questionId === meta.questionId);
-      if (exists) return prev.map((item) => (item.questionId === meta.questionId ? meta : item));
-      return [...prev, meta];
-    });
-  };
+  const progress = useMemo(() => {
+    if (questions.length === 0) return 0;
+    return ((currentIndex + 1) / questions.length) * 100;
+  }, [currentIndex, questions.length]);
 
   const goToNext = () => {
     const nextIndex = currentIndex + 1;
@@ -25,17 +21,18 @@ export function useInterviewSession(questions: InterviewQuestion[]) {
     return true;
   };
 
-  const resetTimer = () => setTimeLeftSec(currentQuestion?.timeLimitSec ?? 120);
+  const resetTimerToCurrent = () => {
+    setTimeLeftSec(currentQuestion?.timeLimitSec ?? 120);
+  };
 
   return {
     currentIndex,
     currentQuestion,
-    responsesMeta,
+    isLastQuestion,
     timeLeftSec,
     setTimeLeftSec,
     progress,
-    saveResponseMeta,
     goToNext,
-    resetTimer
+    resetTimerToCurrent
   };
 }

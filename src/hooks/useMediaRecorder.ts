@@ -4,6 +4,7 @@ type RecorderState = "idle" | "recording" | "paused";
 
 interface StopResult {
   blob: Blob;
+  mimeType: string;
   durationSec: number;
   startedAt: string;
   endedAt: string;
@@ -93,6 +94,7 @@ export function useMediaRecorder(stream: MediaStream | null) {
 
     return {
       blob,
+      mimeType: mimeType ?? "video/webm",
       durationSec: Math.round(elapsedMs / 1000),
       startedAt: new Date(startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),

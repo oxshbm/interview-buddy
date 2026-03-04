@@ -75,14 +75,13 @@ export default function ResultsPage() {
       <section className="mb-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Strengths</CardTitle>
+            <CardTitle>Recording Summary</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-              {report.strengths.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>Total recording duration: {state.recording?.durationSec ?? 0}s</p>
+            <p>Question timeline segments: {state.timeline.length}</p>
+            <p>TTS provider: {state.tts.provider}</p>
+            <p>TTS fallback used: {state.tts.fallbackUsed ? "Yes" : "No"}</p>
           </CardContent>
         </Card>
         <Card>
@@ -99,6 +98,21 @@ export default function ResultsPage() {
         </Card>
       </section>
 
+      <section className="mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Strengths</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+              {report.strengths.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </section>
+
       <Card>
         <CardHeader>
           <CardTitle>Question Breakdown</CardTitle>
@@ -108,6 +122,7 @@ export default function ResultsPage() {
             {report.questionScores.map((item) => (
               <div key={item.questionId} className="rounded-md border p-3">
                 <p className="text-sm font-semibold">{item.questionId.toUpperCase()} · Overall {item.overall}</p>
+                <p className="text-sm text-muted-foreground">{item.questionText}</p>
                 <p className="text-sm text-muted-foreground">Speech {item.speechScore} · Content {item.contentScore} · Body Language {item.bodyLanguageScore}</p>
               </div>
             ))}
