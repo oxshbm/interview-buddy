@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "server:dev": "node server/index.mjs",
+    "dev:full": "echo \"Run npm run server:dev and npm run dev in separate terminals\""
   },
   "dependencies": {
     "@radix-ui/react-progress": "^1.1.7",

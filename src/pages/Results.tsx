@@ -22,7 +22,7 @@ export default function ResultsPage() {
     );
   }
 
-  const report = buildInterviewReport(state);
+  const report = state.aiReport ?? buildInterviewReport(state);
 
   return (
     <main className="mx-auto w-full max-w-6xl p-6 md:p-8">
@@ -82,6 +82,7 @@ export default function ResultsPage() {
             <p>Question timeline segments: {state.timeline.length}</p>
             <p>TTS provider: {state.tts.provider}</p>
             <p>TTS fallback used: {state.tts.fallbackUsed ? "Yes" : "No"}</p>
+            {state.aiSummary ? <p>AI summary: {state.aiSummary}</p> : null}
           </CardContent>
         </Card>
         <Card>
@@ -129,6 +130,23 @@ export default function ResultsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {state.transcript?.length ? (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Conversation Transcript</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {state.transcript.map((turn) => (
+              <div key={turn.questionId} className="rounded-md border p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{turn.category}{turn.isFollowUp ? " · Follow-up" : ""}</p>
+                <p className="text-sm font-medium">{turn.questionText}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{turn.answerText}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
     </main>
   );
 }

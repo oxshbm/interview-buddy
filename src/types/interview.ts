@@ -1,3 +1,5 @@
+import type { InterviewReport } from "./report";
+
 export type InterviewType = "technical" | "hr";
 export type TtsProvider = "browser" | "self_hosted";
 
@@ -32,6 +34,9 @@ export interface ResultsRouteState {
   answeredQuestions: number;
   recording: InterviewRecordingBundle | null;
   timeline: QuestionTimelineSegment[];
+  transcript?: InterviewTranscriptTurn[];
+  aiReport?: InterviewReport | null;
+  aiSummary?: string | null;
   tts: {
     provider: TtsProvider;
     localeRequested: string;
@@ -39,6 +44,15 @@ export interface ResultsRouteState {
     available: boolean;
     fallbackUsed: boolean;
   };
+}
+
+export interface InterviewTranscriptTurn {
+  questionId: string;
+  questionText: string;
+  category: string;
+  isFollowUp: boolean;
+  answerText: string;
+  answeredAt: string;
 }
 
 export interface InterviewSessionState {

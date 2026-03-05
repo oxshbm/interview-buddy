@@ -10,7 +10,12 @@ const {
   startMock,
   stopMock,
   cancelMock,
-  saveSessionStateMock
+  saveSessionStateMock,
+  startAiSessionMock,
+  finalizeAiSessionMock,
+  speechStartMock,
+  speechStopMock,
+  speechResetMock
 } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   requestPermissionsMock: vi.fn(),
@@ -18,7 +23,25 @@ const {
   startMock: vi.fn(() => true),
   stopMock: vi.fn(async () => null),
   cancelMock: vi.fn(),
-  saveSessionStateMock: vi.fn()
+  saveSessionStateMock: vi.fn(),
+  startAiSessionMock: vi.fn(async () => {
+    throw new Error("AI unavailable");
+  }),
+  finalizeAiSessionMock: vi.fn(async () => ({
+    report: {
+      overallScore: 70,
+      grade: "C",
+      categoryBreakdown: { speech: 70, content: 70, bodyLanguage: 70 },
+      questionScores: [],
+      strengths: ["test"],
+      improvements: ["test"]
+    },
+    summary: "none",
+    transcript: []
+  })),
+  speechStartMock: vi.fn(() => false),
+  speechStopMock: vi.fn(),
+  speechResetMock: vi.fn()
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -84,6 +107,26 @@ vi.mock("../hooks/useQuestionNarration", () => ({
   })
 }));
 
+vi.mock("../hooks/useSpeechRecognition", () => ({
+  useSpeechRecognition: () => ({
+    state: "unsupported",
+    error: null,
+    supported: false,
+    finalTranscript: "",
+    interimTranscript: "",
+    transcript: "",
+    start: speechStartMock,
+    stop: speechStopMock,
+    reset: speechResetMock
+  })
+}));
+
+vi.mock("../lib/ai/interviewApi", () => ({
+  startAiSession: startAiSessionMock,
+  submitAiTurn: vi.fn(async () => ({ done: true, question: null })),
+  finalizeAiSession: finalizeAiSessionMock
+}));
+
 vi.mock("../lib/interview-data", () => ({
   getQuestionsByType: () => [
     {
@@ -109,6 +152,11 @@ describe("InterviewPage", () => {
     stopMock.mockClear();
     cancelMock.mockReset();
     saveSessionStateMock.mockReset();
+    startAiSessionMock.mockClear();
+    finalizeAiSessionMock.mockClear();
+    speechStartMock.mockClear();
+    speechStopMock.mockClear();
+    speechResetMock.mockClear();
   });
 
   it("renders only the End Interview control", async () => {
