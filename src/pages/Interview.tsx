@@ -11,6 +11,8 @@ import { getQuestionsByType } from "../lib/interview-data";
 import { saveSessionState } from "../lib/storage";
 import type { InterviewType, QuestionTimelineSegment, ResultsRouteState } from "../types/interview";
 
+const NARRATION_SAFETY_TIMEOUT_MS = 11_000;
+
 export default function InterviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -82,7 +84,26 @@ export default function InterviewPage() {
 
     const narrationStartMs = nowMs();
     setStatusMessage("Narrating question...");
-    const spoken = await narration.speak(currentQuestion.prompt);
+    let timedOut = false;
+    let timeoutId: number | null = null;
+    const spoken = await Promise.race<boolean>([
+      narration.speak(currentQuestion.prompt),
+      new Promise<boolean>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          timedOut = true;
+          reject(new Error("Narration timed out."));
+        }, NARRATION_SAFETY_TIMEOUT_MS);
+      })
+    ])
+      .catch(() => {
+        narration.cancel();
+        return false;
+      })
+      .finally(() => {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+      });
     const narrationEndMs = nowMs();
 
     if (endingRef.current || interviewPaused) return;
@@ -98,7 +119,11 @@ export default function InterviewPage() {
 
     setTimeLeftSec(currentQuestion.timeLimitSec);
     setTimerActive(true);
-    setStatusMessage(spoken ? "Answer timer running." : "TTS unavailable. Continue with text question.");
+    if (spoken) {
+      setStatusMessage("Answer timer running.");
+      return;
+    }
+    setStatusMessage(timedOut ? "Narration timed out. Continue with text question." : "TTS unavailable. Continue with text question.");
   }, [currentQuestion, interviewPaused, interviewStarted, narration, nowMs, setTimeLeftSec]);
 
   const finishInterview = useCallback(async () => {

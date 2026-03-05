@@ -13,6 +13,8 @@ export function useQuestionNarration(provider: TtsProvider = "browser", preferre
 
   const speak = async (text: string): Promise<boolean> => {
     if (!service.isAvailable()) {
+      setState("idle");
+      setError("TTS unavailable. Continuing in text-only mode.");
       setFallbackUsed(true);
       return false;
     }
@@ -24,9 +26,16 @@ export function useQuestionNarration(provider: TtsProvider = "browser", preferre
       setLocaleResolved(result.localeResolved);
       setState("idle");
       return true;
-    } catch {
-      setState("error");
-      setError("Unable to narrate this question. Continuing in text-only mode.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message.toLowerCase() : "";
+      setState("idle");
+      if (message.includes("timed out")) {
+        setError("Narration timed out. Continuing in text-only mode.");
+      } else if (message.includes("not allowed")) {
+        setError("Narration is blocked by browser autoplay policy. Continuing in text-only mode.");
+      } else {
+        setError("Unable to narrate this question. Continuing in text-only mode.");
+      }
       setFallbackUsed(true);
       return false;
     }
@@ -35,6 +44,7 @@ export function useQuestionNarration(provider: TtsProvider = "browser", preferre
   const cancel = () => {
     service.cancel();
     setState("idle");
+    setError(null);
   };
 
   return {

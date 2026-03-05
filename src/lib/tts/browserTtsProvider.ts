@@ -4,6 +4,20 @@ export interface SpeechSynthesisVoiceInfo {
   default: boolean;
 }
 
+const BROWSER_TTS_TIMEOUT_MS = 10_000;
+const DEBUG_TTS = import.meta.env.DEV;
+
+let activeSpeakCancel: (() => void) | null = null;
+
+function debugLog(message: string, payload?: unknown) {
+  if (!DEBUG_TTS) return;
+  if (typeof payload === "undefined") {
+    console.debug(`[tts] ${message}`);
+    return;
+  }
+  console.debug(`[tts] ${message}`, payload);
+}
+
 function selectVoice(voices: SpeechSynthesisVoice[], preferredLang: string): SpeechSynthesisVoice | null {
   const exact = voices.find((voice) => voice.lang.toLowerCase() === preferredLang.toLowerCase());
   if (exact) return exact;
@@ -37,6 +51,11 @@ export function speakWithBrowserTts(
       return;
     }
 
+    if (activeSpeakCancel) {
+      activeSpeakCancel();
+      activeSpeakCancel = null;
+    }
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = options?.lang ?? "en-US";
     utterance.rate = options?.rate ?? 1;
@@ -49,19 +68,79 @@ export function speakWithBrowserTts(
       utterance.lang = selectedVoice.lang;
     }
 
+    let settled = false;
+    const timerId = window.setTimeout(() => {
+      finalizeReject(new Error("Question narration timed out."));
+      window.speechSynthesis.cancel();
+      debugLog("Narration timed out.");
+    }, BROWSER_TTS_TIMEOUT_MS);
+
+    const cleanup = () => {
+      window.clearTimeout(timerId);
+      utterance.onstart = null;
+      utterance.onend = null;
+      utterance.onerror = null;
+      if (activeSpeakCancel === cancelActiveNarration) {
+        activeSpeakCancel = null;
+      }
+    };
+
+    const finalizeResolve = (value: { localeResolved: string | null }) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    };
+
+    const finalizeReject = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    const cancelActiveNarration = () => {
+      if (settled) return;
+      window.speechSynthesis.cancel();
+      finalizeReject(new Error("Question narration was canceled."));
+      debugLog("Narration canceled.");
+    };
+
+    activeSpeakCancel = cancelActiveNarration;
+
+    utterance.onstart = () => {
+      debugLog("Narration started.", { lang: utterance.lang, voice: selectedVoice?.name ?? null });
+    };
+
     utterance.onend = () => {
-      resolve({ localeResolved: selectedVoice?.lang ?? utterance.lang ?? null });
+      debugLog("Narration completed.");
+      finalizeResolve({ localeResolved: selectedVoice?.lang ?? utterance.lang ?? null });
     };
 
-    utterance.onerror = () => {
-      reject(new Error("Unable to play question narration."));
+    utterance.onerror = (event) => {
+      const errorType = "error" in event ? event.error : "unknown";
+      debugLog("Narration failed.", { errorType });
+      finalizeReject(new Error("Unable to play question narration."));
     };
 
-    window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+    debugLog("Narration queued.", { lang: utterance.lang, voiceCount: voices.length });
+
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch (error) {
+      const cause = error instanceof Error ? error.message : "unknown error";
+      finalizeReject(new Error(`Unable to play question narration: ${cause}`));
+    }
   });
 }
 
 export function cancelBrowserTts(): void {
   if (!isBrowserTtsAvailable()) return;
+  if (activeSpeakCancel) {
+    activeSpeakCancel();
+    return;
+  }
   window.speechSynthesis.cancel();
 }
