@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
 import { useInterviewSession } from "../hooks/useInterviewSession";
 import { useMediaPermissions } from "../hooks/useMediaPermissions";
@@ -31,9 +30,8 @@ export default function InterviewPage() {
   const narration = useQuestionNarration("browser", "en-US");
 
   const [interviewStarted, setInterviewStarted] = useState(false);
-  const [interviewPaused, setInterviewPaused] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string>("Click Start Interview to begin continuous recording.");
+  const [statusMessage, setStatusMessage] = useState<string>("Preparing interview session...");
   const [timeline, setTimeline] = useState<QuestionTimelineSegment[]>([]);
   const previewRef = useRef<HTMLVideoElement>(null);
   const interviewStartMsRef = useRef<number | null>(null);
@@ -80,7 +78,7 @@ export default function InterviewPage() {
   }, [commitSegment, nowMs]);
 
   const narrateCurrentQuestion = useCallback(async () => {
-    if (!currentQuestion || !interviewStarted || interviewPaused || endingRef.current) return;
+    if (!currentQuestion || !interviewStarted || endingRef.current) return;
 
     const narrationStartMs = nowMs();
     setStatusMessage("Narrating question...");
@@ -106,7 +104,7 @@ export default function InterviewPage() {
       });
     const narrationEndMs = nowMs();
 
-    if (endingRef.current || interviewPaused) return;
+    if (endingRef.current) return;
 
     activeSegmentRef.current = {
       questionId: currentQuestion.id,
@@ -124,7 +122,7 @@ export default function InterviewPage() {
       return;
     }
     setStatusMessage(timedOut ? "Narration timed out. Continue with text question." : "TTS unavailable. Continue with text question.");
-  }, [currentQuestion, interviewPaused, interviewStarted, narration, nowMs, setTimeLeftSec]);
+  }, [currentQuestion, interviewStarted, narration, nowMs, setTimeLeftSec]);
 
   const finishInterview = useCallback(async () => {
     if (endingRef.current) return;
@@ -163,12 +161,12 @@ export default function InterviewPage() {
   }, [finalizeCurrentSegment, interviewType, narration, navigate, questions.length, recorder]);
 
   useEffect(() => {
-    if (!interviewStarted || interviewPaused || endingRef.current) return;
+    if (!interviewStarted || endingRef.current) return;
     void narrateCurrentQuestion();
-  }, [currentIndex, interviewPaused, interviewStarted, narrateCurrentQuestion]);
+  }, [currentIndex, interviewStarted, narrateCurrentQuestion]);
 
   useEffect(() => {
-    if (!timerActive || interviewPaused || endingRef.current) return;
+    if (!timerActive || endingRef.current) return;
 
     const id = window.setInterval(() => {
       setTimeLeftSec((prev) => {
@@ -190,11 +188,28 @@ export default function InterviewPage() {
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [finishInterview, finalizeCurrentSegment, goToNext, interviewPaused, isLastQuestion, setTimeLeftSec, timerActive]);
+  }, [finishInterview, finalizeCurrentSegment, goToNext, isLastQuestion, setTimeLeftSec, timerActive]);
 
-  const handleStartInterview = () => {
-    if (permissionState !== "granted" || !recorder.canRecord || !currentQuestion) {
-      setStatusMessage("Camera/microphone permission and recording support are required.");
+  useEffect(() => {
+    if (endingRef.current || interviewStarted || !currentQuestion) return;
+
+    if (permissionState === "unsupported") {
+      setStatusMessage("Media devices are not supported in this browser.");
+      return;
+    }
+
+    if (permissionState === "denied") {
+      setStatusMessage("Camera or microphone permission is required to start.");
+      return;
+    }
+
+    if (permissionState !== "granted") {
+      setStatusMessage("Waiting for camera and microphone permissions...");
+      return;
+    }
+
+    if (!recorder.canRecord) {
+      setStatusMessage("Recording is unavailable on this browser/device.");
       return;
     }
 
@@ -209,100 +224,63 @@ export default function InterviewPage() {
     }
 
     setInterviewStarted(true);
-    setInterviewPaused(false);
     setStatusMessage("Interview recording started.");
-  };
-
-  const handlePauseResumeInterview = () => {
-    if (!interviewStarted || endingRef.current) return;
-
-    if (!interviewPaused) {
-      narration.cancel();
-      recorder.pause();
-      setInterviewPaused(true);
-      setTimerActive(false);
-      setStatusMessage("Interview paused.");
-      return;
-    }
-
-    recorder.resume();
-    setInterviewPaused(false);
-    setStatusMessage("Interview resumed.");
-
-    if (activeSegmentRef.current) {
-      setTimerActive(true);
-    }
-  };
-
-  const handleReplayNarration = async () => {
-    if (!currentQuestion || timerActive || !interviewStarted || endingRef.current) return;
-    setStatusMessage("Replaying question audio...");
-    await narration.speak(currentQuestion.prompt);
-    if (!timerActive && !interviewPaused) {
-      setStatusMessage("Answer timer running.");
-    }
-  };
+  }, [currentQuestion, interviewStarted, permissionState, recorder]);
 
   if (!currentQuestion) return null;
 
   return (
-    <main className="mx-auto w-full max-w-5xl p-6 md:p-8">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Question {currentIndex + 1} of {questions.length}</p>
-          <h1 className="text-2xl font-semibold">{currentQuestion.category}</h1>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Time Left</p>
-          <p className="text-2xl font-semibold tabular-nums">{timeLeftSec}s</p>
-        </div>
-      </div>
-      <Progress value={progress} className="mb-6" />
-
-      <section className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>{currentQuestion.prompt}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border bg-slate-900 p-1">
-              <video ref={previewRef} autoPlay muted playsInline className="h-56 w-full rounded object-cover" />
+    <main className="relative min-h-screen w-full overflow-hidden px-4 py-5 md:px-8 md:py-8">
+      <section className="relative flex min-h-[calc(100vh-3rem)] w-full items-center justify-center rounded-2xl border border-white/60 bg-slate-900/95 shadow-2xl">
+        <div className="absolute left-4 right-4 top-4 z-20 rounded-xl border border-white/20 bg-slate-950/75 p-4 backdrop-blur sm:left-6 sm:right-6 sm:top-6">
+          <div className="mb-3 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-300">Question {currentIndex + 1} of {questions.length}</p>
+              <h1 className="text-base font-semibold text-white sm:text-lg">{currentQuestion.category}</h1>
             </div>
-            <p className="text-sm text-muted-foreground">{statusMessage}</p>
-            {narration.error ? <p className="text-sm text-destructive">{narration.error}</p> : null}
-            {!narration.available ? <p className="text-sm text-destructive">TTS unavailable. Questions will be text-only.</p> : null}
-            {recorder.error ? <p className="text-sm text-destructive">{recorder.error}</p> : null}
-            {permissionState !== "granted" ? <p className="text-sm text-destructive">Camera/mic permission is required to record.</p> : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Interview Controls</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button onClick={handleStartInterview} disabled={interviewStarted || permissionState !== "granted" || !recorder.canRecord} className="w-full">
-              Start Interview
-            </Button>
-            <Button variant="outline" onClick={handlePauseResumeInterview} disabled={!interviewStarted || endingRef.current} className="w-full">
-              {interviewPaused ? "Resume Interview" : "Pause Interview"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => void handleReplayNarration()}
-              disabled={!interviewStarted || timerActive || narration.state === "narrating" || endingRef.current}
-              className="w-full"
-            >
-              Replay Question Audio
-            </Button>
-            <Button variant="destructive" onClick={() => void finishInterview()} disabled={!interviewStarted || endingRef.current} className="w-full">
-              End Interview
-            </Button>
-            <div className="rounded-md border bg-muted p-3 text-xs text-muted-foreground">
-              Timeline segments captured: {timeline.length}
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wide text-slate-300">Time Left</p>
+              <p className="text-xl font-semibold text-white tabular-nums sm:text-2xl">{timeLeftSec}s</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="mb-3 text-sm text-slate-200">{currentQuestion.prompt}</p>
+          <Progress value={progress} className="h-2 bg-slate-700" />
+        </div>
+
+        <div className="ai-stage-breath relative z-10 flex h-52 w-52 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 via-cyan-300 to-blue-500 shadow-[0_0_60px_rgba(34,211,238,0.35)] sm:h-72 sm:w-72 md:h-80 md:w-80">
+          <div className="flex h-[86%] w-[86%] items-center justify-center rounded-full bg-slate-950/25">
+            <span className="text-lg font-semibold tracking-[0.28em] text-white sm:text-xl">AI</span>
+          </div>
+        </div>
+
+        <div className="absolute right-4 top-[8.5rem] z-30 w-36 overflow-hidden rounded-xl border border-white/35 bg-slate-950 shadow-xl sm:right-6 sm:w-44 md:w-52">
+          <div className="aspect-video bg-slate-900">
+            <video ref={previewRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+          </div>
+          <p className="truncate px-2 py-1 text-center text-xs font-medium text-slate-100">You</p>
+        </div>
+
+        <div className="absolute bottom-20 left-4 right-4 z-20 sm:left-6 sm:right-6">
+          <div className="rounded-xl border border-white/20 bg-slate-950/75 px-4 py-3 text-sm text-slate-200 backdrop-blur">
+            <p>{statusMessage}</p>
+            {narration.error ? <p className="mt-1 text-red-300">{narration.error}</p> : null}
+            {!narration.available ? <p className="mt-1 text-red-300">TTS unavailable. Questions will be text-only.</p> : null}
+            {recorder.error ? <p className="mt-1 text-red-300">{recorder.error}</p> : null}
+            {permissionState !== "granted" ? <p className="mt-1 text-red-300">Camera/mic permission is required to record.</p> : null}
+            <p className="mt-1 text-slate-300">Timeline segments captured: {timeline.length}</p>
+          </div>
+        </div>
+
+        <div className="absolute bottom-5 left-1/2 z-40 -translate-x-1/2">
+          <Button
+            variant="destructive"
+            onClick={() => void finishInterview()}
+            disabled={!interviewStarted || endingRef.current}
+            className="h-11 min-w-40 rounded-full px-8"
+          >
+            End Interview
+          </Button>
+        </div>
       </section>
     </main>
   );
