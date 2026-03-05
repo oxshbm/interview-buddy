@@ -27,18 +27,18 @@ export default function SetupPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-5xl p-6 md:p-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-6 md:px-8 md:py-8">
       <div className="mb-6 space-y-2">
         <h1 className="text-3xl font-semibold">Interview Setup</h1>
         <p className="text-muted-foreground">Select interview type and verify your camera + microphone before starting.</p>
       </div>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <Card>
+      <section className="grid flex-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+        <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle>1. Choose interview mode</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-1 flex-col space-y-3">
             <button
               className={`w-full rounded-md border p-4 text-left transition ${interviewType === "technical" ? "border-primary bg-sky-50" : "bg-white"}`}
               onClick={() => setInterviewType("technical")}
@@ -56,13 +56,13 @@ export default function SetupPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle>2. Camera and Microphone Check</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="overflow-hidden rounded-md border bg-slate-900">
-              <video ref={videoRef} autoPlay muted playsInline className="h-56 w-full object-cover" />
+          <CardContent className="flex flex-1 flex-col space-y-4">
+            <div className="min-h-56 flex-1 overflow-hidden rounded-md border bg-slate-900">
+              <video ref={videoRef} autoPlay muted playsInline className="h-full min-h-56 w-full object-cover" />
             </div>
             <div className="text-sm">
               <p>
@@ -83,7 +83,7 @@ export default function SetupPage() {
         </Card>
       </section>
 
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex justify-end md:mt-8">
         <Button onClick={startInterview} disabled={!canStart} className="h-11 px-6">
           Start Interview
         </Button>
